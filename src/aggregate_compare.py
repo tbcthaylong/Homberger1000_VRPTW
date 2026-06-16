@@ -3,6 +3,7 @@ from pathlib import Path
 import argparse
 import pandas as pd
 import matplotlib.pyplot as plt
+from vrptw_core import require_bih_summary
 
 def main():
     p=argparse.ArgumentParser(description='Aggregate and compare ALNS, Tabu, ORTools results')
@@ -10,6 +11,8 @@ def main():
     p.add_argument('--out', default='results/COMPARE')
     args=p.parse_args()
     results=Path(args.results); out=Path(args.out); out.mkdir(parents=True, exist_ok=True)
+    # Bắt buộc phải có BIH_summary.csv để BIH là nghiệm nền trong mọi bảng so sánh.
+    require_bih_summary(results)
     files=list(results.glob('*/*_summary.csv'))
     if not files:
         raise SystemExit('Không thấy file *_summary.csv trong results. Hãy chạy thuật toán trước.')
@@ -19,6 +22,8 @@ def main():
         except Exception as e: print('Bỏ qua',f,e)
     df=pd.concat(dfs, ignore_index=True)
     df=df[df['algorithm'].isin(['BIH','ALNS','TABU','ORTOOLS'])].copy()
+    if 'BIH' not in set(df['algorithm']):
+        raise SystemExit('Bảng tổng hợp bắt buộc phải có BIH. Hãy chạy run_bih.py trước.')
     df.to_csv(out/'all_results.csv', index=False, encoding='utf-8-sig')
     summary=df.groupby('algorithm').agg(
         instances=('instance','count'),
@@ -53,4 +58,8 @@ def main():
     print('\nSUMMARY BY ALGORITHM')
     print(summary.to_string(index=False))
     print('\nĐã lưu kết quả vào:', out)
-if __name__=='__main__': main()
+if __name__=='__main__':
+    try:
+        main()
+    except FileNotFoundError as e:
+        raise SystemExit(str(e))

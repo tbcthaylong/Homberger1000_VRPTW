@@ -258,3 +258,47 @@ def try_merge_routes(inst: Instance, routes: List[List[int]], max_pairs: int=500
                     routes[i]=cand; routes[j]=[]; routes=remove_empty(routes); improved=True; break
             if improved or checked>=max_pairs: break
     return remove_empty(routes)
+
+def load_bih_baseline(bih_dir: Path, inst: Instance) -> List[List[int]]:
+    """Đọc nghiệm nền BIH đã được tạo bởi run_bih.py.
+
+    Hàm này cố ý KHÔNG tự tạo BIH. Nếu thiếu file BIH, các thuật toán
+    cải tiến phải dừng để bảo đảm quy trình thực nghiệm luôn bắt đầu từ
+    cùng một nghiệm nền đã lưu.
+    """
+    bih_dir = Path(bih_dir)
+    json_path = bih_dir / f'{inst.name}_BIH.json'
+    if not json_path.exists():
+        raise FileNotFoundError(
+            f'Thiếu nghiệm nền BIH cho instance {inst.name}: {json_path}\n'
+            f'Hãy chạy trước: python src\\run_bih.py --data data\\raw --out {bih_dir}'
+        )
+    data = json.loads(json_path.read_text(encoding='utf-8'))
+    routes = data.get('routes')
+    if not isinstance(routes, list) or not routes:
+        raise ValueError(f'File nghiệm nền BIH không hợp lệ: {json_path}')
+    st = solution_stats(inst, routes)
+    if not st['feasible']:
+        raise ValueError(f'Nghiệm nền BIH trong {json_path} không khả thi.')
+    return routes
+
+def require_bih_summary(results_dir: Path, required_instances: Optional[List[str]] = None) -> Path:
+    """Kiểm tra bắt buộc phải có BIH_summary.csv trước khi tổng hợp."""
+    results_dir = Path(results_dir)
+    csv_path = results_dir / 'BIH' / 'BIH_summary.csv'
+    if not csv_path.exists():
+        raise FileNotFoundError(
+            f'Thiếu file {csv_path}. Hãy chạy BIH trước khi chạy tổng hợp:\n'
+            f'python src\\run_bih.py --data data\\raw --out results\\BIH'
+        )
+    if required_instances:
+        with csv_path.open('r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            have = {row.get('instance') for row in reader}
+        missing = sorted(set(required_instances) - have)
+        if missing:
+            raise FileNotFoundError(
+                'BIH_summary.csv còn thiếu các instance: ' + ', '.join(missing[:10]) +
+                (' ...' if len(missing) > 10 else '')
+            )
+    return csv_path

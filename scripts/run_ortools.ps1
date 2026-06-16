@@ -1,1 +1,1 @@
-python src\run_ortools.py --data data\raw --out results\ORTOOLS --time_limit 90
+python src\run_ortools.py --data data\raw --out results\ORTOOLS --bih_dir results\BIH --time_limit 90

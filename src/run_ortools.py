@@ -1,7 +1,7 @@
 
 from pathlib import Path
 import argparse, time
-from vrptw_core import read_homberger, list_instance_files, write_solution
+from vrptw_core import read_homberger, list_instance_files, load_bih_baseline, write_solution
 
 def solve_ortools(inst, time_limit=90):
     try:
@@ -56,14 +56,22 @@ def main():
     p=argparse.ArgumentParser(description='Run Google OR-Tools for Homberger VRPTW')
     p.add_argument('--data', default='data/raw')
     p.add_argument('--out', default='results/ORTOOLS')
+    p.add_argument('--bih_dir', default='results/BIH', help='Bắt buộc có nghiệm nền BIH trước khi chạy OR-Tools để bảo đảm đủ mốc so sánh')
     p.add_argument('--instance', default=None)
     p.add_argument('--time_limit', type=float, default=90)
     args=p.parse_args()
     out=Path(args.out); csv=out/'ORTOOLS_summary.csv'
     if csv.exists(): csv.unlink()
     for fp in list_instance_files(Path(args.data), args.instance):
-        inst=read_homberger(fp); t=time.time()
+        inst=read_homberger(fp)
+        # OR-Tools không dùng BIH để khởi tạo, nhưng vẫn bắt buộc có file BIH để quy trình so sánh đầy đủ.
+        load_bih_baseline(Path(args.bih_dir), inst)
+        t=time.time()
         routes=solve_ortools(inst,args.time_limit)
         row=write_solution(out,'ORTOOLS',inst,routes,time.time()-t)
         print(row)
-if __name__=='__main__': main()
+if __name__=='__main__':
+    try:
+        main()
+    except (FileNotFoundError, ValueError) as e:
+        raise SystemExit(str(e))

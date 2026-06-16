@@ -2,11 +2,12 @@
 from pathlib import Path
 import argparse, random, time
 from collections import deque
-from vrptw_core import read_homberger, list_instance_files, best_bih, clone_routes, objective_tuple, solution_stats, relocate_neighbor, swap_neighbor, try_merge_routes, write_solution
+from vrptw_core import read_homberger, list_instance_files, load_bih_baseline, clone_routes, objective_tuple, solution_stats, relocate_neighbor, swap_neighbor, try_merge_routes, write_solution
 
-def tabu_search(inst, time_limit=90, seed=2026, tenure=80, candidates=80):
+def tabu_search(inst, bih_dir, time_limit=90, seed=2026, tenure=80, candidates=80):
     rng=random.Random(seed)
-    current=try_merge_routes(inst,best_bih(inst))
+    # Bắt buộc đọc nghiệm nền BIH đã lưu; không tự tạo BIH tại đây.
+    current=try_merge_routes(inst, load_bih_baseline(Path(bih_dir), inst))
     best=clone_routes(current)
     tabu=deque(maxlen=tenure)
     start=time.time(); it=0
@@ -41,6 +42,7 @@ def main():
     p=argparse.ArgumentParser(description='Run Tabu Search for Homberger VRPTW')
     p.add_argument('--data', default='data/raw')
     p.add_argument('--out', default='results/TABU')
+    p.add_argument('--bih_dir', default='results/BIH', help='Thư mục chứa nghiệm nền BIH đã tạo bởi run_bih.py')
     p.add_argument('--instance', default=None)
     p.add_argument('--time_limit', type=float, default=90)
     p.add_argument('--seed', type=int, default=2026)
@@ -51,7 +53,11 @@ def main():
     if csv.exists(): csv.unlink()
     for fp in list_instance_files(Path(args.data), args.instance):
         inst=read_homberger(fp); t=time.time()
-        routes=tabu_search(inst,args.time_limit,args.seed,args.tenure,args.candidates)
+        routes=tabu_search(inst,args.bih_dir,args.time_limit,args.seed,args.tenure,args.candidates)
         row=write_solution(out,'TABU',inst,routes,time.time()-t,args.seed)
         print(row)
-if __name__=='__main__': main()
+if __name__=='__main__':
+    try:
+        main()
+    except (FileNotFoundError, ValueError) as e:
+        raise SystemExit(str(e))
